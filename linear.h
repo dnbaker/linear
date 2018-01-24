@@ -143,9 +143,9 @@ public:
 
 template<typename K, typename SizeType=std::uint32_t>
 class counter {
-    // Simple class for a linear-search dictionary for tables of up to ~100 integers.
-    // This outperforms trees and hash tables for small numbers of elements.
-    // This is ideal for our taxonomic resolution at classification time, where the number of kmers and therefore assigned taxids is limited.
+    // Simple class for a linear-search counting dictionary.
+    // This outperforms trees and hash tables for small numbers of element (up to ~100 integers).
+    // This is ideal for classifying high-throughput sequencing data, where we know the number of taxids is bounded by the length of the reads.
     std::vector<K> keys_;
     std::vector<SizeType> vals_;
 public:
