@@ -150,7 +150,7 @@ class counter {
     std::vector<SizeType> vals_;
 public:
     using size_type = SizeType;
-    unsigned add(const K &key) {
+    size_type add(const K &key) {
         if(auto it(std::find(keys_.begin(), keys_.end(), key)); it == keys_.end()) {
             vals_.push_back(1);
             keys_.push_back(key);
@@ -160,10 +160,21 @@ public:
             return it - keys_.begin();
         }
     }
-    unsigned get_count(const K &key) const {
+    size_type add(const K &key, size_type inc) {
+        if(auto it(std::find(keys_.begin(), keys_.end(), key)); it == keys_.end()) {
+            vals_.push_back(inc);
+            keys_.push_back(key);
+            return keys_.size() - 1;
+        } else {
+            const size_type ret(it - keys_.begin());
+            vals_[ret] += inc;
+            return ret;
+        }
+    }
+    size_type count(const K &key) const {
         if(auto it(std::find(keys_.begin(), keys_.end(), key)); it != keys_.end())
             return vals_[it - keys_.begin()];
-        else return 0;
+        return 0;
     }
     size_type size() const { return keys_.size();}
     const std::vector<K> &keys() const {return keys_;}
