@@ -177,8 +177,8 @@ public:
         return 0;
     }
     size_type size() const { return keys_.size();}
-    const std::vector<K> &keys() const {return keys_;}
-    const std::vector<K> &vals() const {return vals_;}
+    const std::vector<K>        &keys() const {return keys_;}
+    const std::vector<SizeType> &vals() const {return vals_;}
 };
 
 } // namespace linear
