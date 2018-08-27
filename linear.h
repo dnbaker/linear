@@ -19,6 +19,13 @@ struct free_deleter{
 
 namespace linear {
 
+template<typename T, typename SizeType, class ResizeRatio>
+class set; // forward declaration
+
+template<typename T, typename SizeType=size_t, class ResizeRatio=std::ratio<3,2>>
+void swap(set<T, SizeType, ResizeRatio> &lhs, set<T, SizeType, ResizeRatio> &rhs);
+
+
 template<typename T, typename SizeType=size_t, class ResizeRatio=std::ratio<3,2>>
 class set {
     SizeType n_, m_;
@@ -30,6 +37,7 @@ public:
     using size_type  = SizeType;
     using value_type = T;
     using difference_type = std::make_signed_t<size_type>;
+    using pointer_type = T *;
 
     template<typename... FactoryArgs>
     set(size_type n=0, bool init=!std::is_pod_v<T>,
@@ -43,26 +51,28 @@ public:
             throw std::bad_alloc();
         std::copy(l.begin(), l.end(), data_);
     }
-    set(set &&other): n_(0), m_(0), data_(nullptr) {std::swap(*this, other);}
-    set(const set &other): n_(other.n_), m_(other.m_), data_(std::malloc(sizeof(T) * m_)) {
+    set(set &&other): n_(0), m_(0), data_(nullptr) {
+        this->swap(other);
+    }
+    set(const set &other): n_(other.n_), m_(other.m_), data_(static_cast<pointer_type>(std::malloc(sizeof(T) * m_))) {
         if(data_ == nullptr)
             throw std::bad_alloc();
         std::copy(other.begin(), other.end(), begin());
     }
-    const T *cbegin() const {return data_.get();}
-    const T *cend()   const {return data_.get() + n_;}
-    const T *begin()  const {return data_.get();}
-    const T *end()    const {return data_.get() + n_;}
-    T *begin()        {return data_.get();}
-    T *end()          {return data_.get() + n_;}
-    T *data()         {return data_.get();}
+    const T *cbegin() const  {return data_.get();}
+    const T *cend()   const  {return data_.get() + n_;}
+    const T *begin()  const  {return data_.get();}
+    const T *end()    const  {return data_.get() + n_;}
+    T *begin()               {return data_.get();}
+    T *end()                 {return data_.get() + n_;}
+    T *data()                {return data_.get();}
     const T *data()    const {return data_;}
     T &back()                {return data_.get()[n_ - 1];}
     const T &back()    const {return data_.get()[n_ - 1];}
     T &front() {return data_.get()[0];}
-    const T &front() const {return data_.get()[0];}
-    auto size()     const {return n_;}
-    auto capacity() const {return m_;}
+    const T &front()   const {return data_.get()[0];}
+    auto size()        const {return n_;}
+    auto capacity()    const {return m_;}
     T *find(const T &val) {
         return std::find(begin(), end(), val);
     }
@@ -79,6 +89,15 @@ public:
     T *insert(const T &val) {
         T *it;
         return (it = find(val)) == end() ? &push_back(val): it;
+    }
+    template<class It1, class It2>
+    void insert(It1 it1, It2 it2) {
+        while(it1 < it2) insert(*it1++);
+    }
+    void swap(set &rhs) {
+        std::swap(n_, rhs.n_);
+        std::swap(m_, rhs.m_);
+        std::swap(data_, rhs.data_);
     }
     // Note: push_back and emplace_back are the same *except* that push_back changes size multiplicatively.
     template<typename... Args>
@@ -140,6 +159,10 @@ public:
         }
     }
 };
+template<typename T, typename SizeType=size_t, class ResizeRatio=std::ratio<3,2>>
+void swap(set<T, SizeType, ResizeRatio> &lhs, set<T, SizeType, ResizeRatio> &rhs) {
+    lhs.swap(rhs);
+}
 
 template<typename K, typename SizeType=std::uint32_t>
 class counter {
