@@ -169,6 +169,7 @@ public:
             for(auto &el: *this) el.~T();
         }
     }
+    static constexpr bool support_for_each() {return true;}
 };
 template<typename T, typename SizeType=size_t, class ResizeRatio=std::ratio<3,2>>
 void swap(set<T, SizeType, ResizeRatio> &lhs, set<T, SizeType, ResizeRatio> &rhs) {
@@ -195,7 +196,8 @@ public:
         bool operator>=(const iterator &other) {return ind_ >= other.ind_;}
         bool operator>(const iterator &other) {return ind_ > other.ind_;}
         iterator &operator++() {
-            ++ind_; return *this;
+            ++ind_;
+            return *this;
         }
         iterator operator++(int) const {
             return iterator(ref_, ind_ + 1);
@@ -233,6 +235,14 @@ public:
             return vals_[it - keys_.begin()];
         return 0;
     }
+    template<typename Func>
+    void for_each(const Func &func) {
+        for(size_type i = 0; i < keys_.size(); func(keys_[i], vals_[i]), ++i);
+    }
+    template<typename Func>
+    void for_each(const Func &func) const {
+        for(size_type i = 0; i < keys_.size(); func(keys_[i], vals_[i]), ++i);
+    }
     template<typename Q=K, typename T=std::enable_if_t<std::is_arithmetic_v<Q>>>
     void write(std::FILE *fp) {
         std::fprintf(fp, "Size: %zu", size());
@@ -243,10 +253,11 @@ public:
     size_type size() const { return keys_.size();}
     const std::vector<K>        &keys() const {return keys_;}
     const std::vector<SizeType> &vals() const {return vals_;}
+    static constexpr bool support_for_each() {return true;}
 };
+
 template<typename K, typename V, typename SizeType=::std::size_t>
 class map {
-#pragma message("Warning: map is not complete yet.")
     // Simple class for a linear-search counting dictionary.
     // This outperforms trees and hash tables for small numbers of element (up to ~100 integers).
     // This is ideal for classifying high-throughput sequencing data, where we know the number of taxids is bounded by the length of the reads.
@@ -259,6 +270,9 @@ public:
             keys_.reserve(reserve_size);
             vals_.reserve(reserve_size);
         }
+    }
+    void reserve(size_t nelem) {
+        if(nelem > keys_.size()) keys_.reserve(nelem), vals_.reserve(nelem);
     }
     template <typename K1, typename F, typename... Args>
         std::pair<size_type, bool> uprase_fn(K1 &&key, F fn, Args &&... val) {
@@ -300,6 +314,7 @@ public:
     size_type size() const {return keys_.size();}
     const std::vector<K>        &keys() const {return keys_;}
     const std::vector<SizeType> &vals() const {return vals_;}
+    static constexpr bool support_for_each() {return true;}
 };
 
 } // namespace linear
