@@ -1,9 +1,12 @@
 #ifndef _LINEAR_SET_H__
 #define _LINEAR_SET_H__
 #include <type_traits>
+#include <algorithm>
+#include <functional>
 #include <stdexcept>
 #include <cstring>
 #include <cstdint>
+#include <vector>
 #include <ratio>
 #include <memory>
 #include <cstdlib>
@@ -173,6 +176,77 @@ class counter {
     std::vector<SizeType> vals_;
 public:
     using size_type = SizeType;
+    class iterator {
+        counter &ref_;
+        unsigned ind_;
+    public:
+        iterator(counter &ref, size_type ind): ref_(ref), ind_(ind) {}
+        bool operator==(const iterator &other) {return ind_ == other.ind_;}
+        bool operator<=(const iterator &other) {return ind_ <= other.ind_;}
+        bool operator<(const iterator &other) {return ind_ < other.ind_;}
+        bool operator>=(const iterator &other) {return ind_ >= other.ind_;}
+        bool operator>(const iterator &other) {return ind_ > other.ind_;}
+        iterator operator++() {
+            ++ind_; return *this;
+        }
+        iterator operator++(int) const {
+            iterator ret(ref_, ind_ + 1);
+            return ret;
+        }
+        auto operator*() const {
+            return std::make_pair(std::reference_wrapper(keys_[ind_]), std::reference_wrapper(vals_[ind_]));
+        }
+    };
+    iterator begin() {return iterator(*this, 0);}
+    iterator end() {return iterator(*this, keys_.size());}
+    size_type add(K &&key, size_type inc=1) {
+        if(auto it(std::find(keys_.begin(), keys_.end(), key)); it == keys_.end()) {
+            vals_.push_back(inc);
+            keys_.push_back(std::move(key));
+            return keys_.size() - 1;
+        } else {
+            const size_type ret = it - keys_.begin();
+            vals_[ret] += inc;
+            return ret;
+        }
+    }
+    size_type add(const K &key, size_type inc=1) {
+        if(auto it(std::find(keys_.begin(), keys_.end(), key)); it == keys_.end()) {
+            vals_.push_back(inc);
+            keys_.push_back(key);
+            return keys_.size() - 1;
+        } else {
+            const size_type ret(it - keys_.begin());
+            vals_[ret] += inc;
+            return ret;
+        }
+    }
+    size_type count(const K &key) const {
+        if(auto it(std::find(keys_.begin(), keys_.end(), key)); it != keys_.end())
+            return vals_[it - keys_.begin()];
+        return 0;
+    }
+    template<typename Q=K, typename T=std::enable_if_t<std::is_arithmetic_v<Q>>>
+    void write(std::FILE *fp) {
+        std::fprintf(fp, "Size: %zu", size());
+        for(size_t i(0); i < size(); ++i) {
+            std::fprintf(stderr, "%zu,%zu\n", size_t(keys_[i]), size_t(vals_[i]));
+        }
+    }
+    size_type size() const { return keys_.size();}
+    const std::vector<K>        &keys() const {return keys_;}
+    const std::vector<SizeType> &vals() const {return vals_;}
+};
+template<typename K, typename SizeType=std::uint32_t>
+class unordered_map {
+#pragma message("Warning: unordered_map is not complete yet.")
+    // Simple class for a linear-search counting dictionary.
+    // This outperforms trees and hash tables for small numbers of element (up to ~100 integers).
+    // This is ideal for classifying high-throughput sequencing data, where we know the number of taxids is bounded by the length of the reads.
+    std::vector<K> keys_;
+    std::vector<SizeType> vals_;
+public:
+    using size_type = SizeType;
     size_type add(const K &key) {
         if(auto it(std::find(keys_.begin(), keys_.end(), key)); it == keys_.end()) {
             vals_.push_back(1);
@@ -199,7 +273,7 @@ public:
             return vals_[it - keys_.begin()];
         return 0;
     }
-    size_type size() const { return keys_.size();}
+    size_type size() const {return keys_.size();}
     const std::vector<K>        &keys() const {return keys_;}
     const std::vector<SizeType> &vals() const {return vals_;}
 };
