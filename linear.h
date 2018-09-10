@@ -194,12 +194,11 @@ public:
         bool operator<(const iterator &other) {return ind_ < other.ind_;}
         bool operator>=(const iterator &other) {return ind_ >= other.ind_;}
         bool operator>(const iterator &other) {return ind_ > other.ind_;}
-        iterator operator++() {
+        iterator &operator++() {
             ++ind_; return *this;
         }
         iterator operator++(int) const {
-            iterator ret(ref_, ind_ + 1);
-            return ret;
+            return iterator(ref_, ind_ + 1);
         }
         auto operator*() const {
             return std::make_pair(std::reference_wrapper(keys_[ind_]), std::reference_wrapper(vals_[ind_]));
