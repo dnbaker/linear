@@ -129,6 +129,14 @@ public:
     void zero()  {std::memset(data_.get(), 0, sizeof(T) * n_);} // DOES NOT CALL DESTRUCTORS
     void clear() {n_ = 0;}
     bool empty() const {return size() == 0;}
+    template<typename Func>
+    void for_each(const Func &func) {
+        for(T *d = data_.get(), *e = data_.get() + n_; d < e; func(*d++));
+    }
+    template<typename Func>
+    void for_each(const Func &func) const {
+        for(const T *d = data_.get(), *e = data_.get() + n_; d < e; func(*d++));
+    }
     void reserve(size_t newsize) {
         if(newsize > m_) {
             auto tmp(static_cast<T*>(std::realloc(data_.get(), sizeof(T) * newsize)));
@@ -237,41 +245,58 @@ public:
     const std::vector<K>        &keys() const {return keys_;}
     const std::vector<SizeType> &vals() const {return vals_;}
 };
-template<typename K, typename SizeType=std::uint32_t>
-class unordered_map {
-#pragma message("Warning: unordered_map is not complete yet.")
+template<typename K, typename V, typename SizeType=::std::size_t>
+class map {
+#pragma message("Warning: map is not complete yet.")
     // Simple class for a linear-search counting dictionary.
     // This outperforms trees and hash tables for small numbers of element (up to ~100 integers).
     // This is ideal for classifying high-throughput sequencing data, where we know the number of taxids is bounded by the length of the reads.
     std::vector<K> keys_;
-    std::vector<SizeType> vals_;
+    std::vector<V> vals_;
 public:
     using size_type = SizeType;
-    size_type add(const K &key) {
-        if(auto it(std::find(keys_.begin(), keys_.end(), key)); it == keys_.end()) {
-            vals_.push_back(1);
-            keys_.push_back(key);
-            return keys_.size() - 1;
-        } else {
-            ++vals_[it - keys_.begin()];
-            return it - keys_.begin();
+    map(size_t reserve_size=0) {
+        if(reserve_size) {
+            keys_.reserve(reserve_size);
+            vals_.reserve(reserve_size);
         }
     }
-    size_type add(const K &key, size_type inc) {
+    template <typename K1, typename F, typename... Args>
+        std::pair<size_type, bool> uprase_fn(K1 &&key, F fn, Args &&... val) {
         if(auto it(std::find(keys_.begin(), keys_.end(), key)); it == keys_.end()) {
-            vals_.push_back(inc);
-            keys_.push_back(key);
-            return keys_.size() - 1;
+            keys_.emplace_back(key);
+            vals_.emplace_back(std::forward<Args>(val)...);
+            return std::make_pair(size_type(keys_.size()), false);
         } else {
-            const size_type ret(it - keys_.begin());
-            vals_[ret] += inc;
-            return ret;
+            const size_type dist = it - keys_.begin();
+            fn(keys_[dist], vals_[dist]);
+            return std::make_pair(dist, true);
         }
     }
-    size_type count(const K &key) const {
-        if(auto it(std::find(keys_.begin(), keys_.end(), key)); it != keys_.end())
-            return vals_[it - keys_.begin()];
-        return 0;
+    template<typename Q=V, typename=std::enable_if_t<std::is_trivially_constructible_v<Q>>>
+    V &operator[](const K &key) {
+        size_type ind;
+        if(auto it = std::find(keys_.begin(), keys_.end(), key) ; it == keys_.end()) {
+            ind = vals_.size();
+            keys_.push_back(key);
+            vals_.emplace_back();
+        } else ind = it - keys_.begin();
+        return vals_[ind];
+    }
+    V &operator[](const K &key) const {
+        size_type ind;
+        if(auto it = std::find(keys_.begin(), keys_.end(), key) ; unlikely(it == keys_.end())) {
+            throw std::out_of_range(std::string("Key ") + key + " not found");
+        } else ind = it - keys_.begin();
+        return vals_[ind];
+    }
+    template<typename Func>
+    void for_each(const Func &func) {
+        for(size_type i = 0; i < keys_.size(); func(keys_[i], vals_[i]), ++i);
+    }
+    template<typename Func>
+    void for_each(const Func &func) const {
+        for(size_type i = 0; i < keys_.size(); func(keys_[i], vals_[i]), ++i);
     }
     size_type size() const {return keys_.size();}
     const std::vector<K>        &keys() const {return keys_;}
