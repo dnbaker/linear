@@ -15,21 +15,21 @@ namespace del {
 struct free_deleter{
     template <typename T>
     void operator()(T *p) const {
-        std::free(const_cast<std::remove_const_t<T>*>(p));
+        std::free(const_cast<typename std::remove_const<T>::type*>(p));
     }
 };
 }
 
 namespace linear {
 
-template<typename T, typename SizeType, class ResizeRatio>
+template<typename T, typename SizeType=size_t, class ResizeRatio=std::ratio<3,2>>
 class set; // forward declaration
 
 template<typename T, typename SizeType=size_t, class ResizeRatio=std::ratio<3,2>>
 void swap(set<T, SizeType, ResizeRatio> &lhs, set<T, SizeType, ResizeRatio> &rhs);
 
 
-template<typename T, typename SizeType=size_t, class ResizeRatio=std::ratio<3,2>>
+template<typename T, typename SizeType, class ResizeRatio>
 class set {
     SizeType n_, m_;
     std::unique_ptr<T, del::free_deleter> data_;
@@ -39,11 +39,11 @@ class set {
 public:
     using size_type  = SizeType;
     using value_type = T;
-    using difference_type = std::make_signed_t<size_type>;
+    using difference_type = typename std::make_signed<size_type>::type;
     using pointer_type = T *;
 
     template<typename... FactoryArgs>
-    set(size_type n=0, bool init=!std::is_pod_v<T>,
+    set(size_type n=0, bool init=!std::is_pod<T>::value,
         FactoryArgs &&...args):
             n_{0}, m_{n}, data_{static_cast<T *>(std::malloc(sizeof(T) * n))} {
         if(data_ == nullptr)
@@ -165,9 +165,7 @@ public:
     T &operator[](size_type idx) {return data_[idx];}
     const T &operator[](size_type idx) const {return data_[idx];}
     ~set(){
-        if constexpr(!std::is_trivially_destructible_v<T>) {
-            for(auto &el: *this) el.~T();
-        }
+        for(auto &el: *this) el.~T();
     }
     static constexpr bool support_for_each() {return true;}
 };
@@ -203,13 +201,18 @@ public:
             return iterator(ref_, ind_ + 1);
         }
         auto operator*() const {
-            return std::make_pair(std::reference_wrapper(keys_[ind_]), std::reference_wrapper(vals_[ind_]));
+            return std::make_pair(std::reference_wrapper<K>(keys_[ind_]), std::reference_wrapper<SizeType>(vals_[ind_]));
         }
     };
     iterator begin() {return iterator(*this, 0);}
     iterator end() {return iterator(*this, keys_.size());}
     size_type add(K &&key, size_type inc=1) {
+#if __cplusplus >= 201703L     // }
         if(auto it(std::find(keys_.begin(), keys_.end(), key)); it == keys_.end()) {
+#else
+        auto it(std::find(keys_.begin(), keys_.end(), key));
+        if(it == keys_.end()) { // } Brackets so that editor's bracket tracking isn't confused.
+#endif
             vals_.push_back(inc);
             keys_.push_back(std::move(key));
             return keys_.size() - 1;
@@ -220,20 +223,20 @@ public:
         }
     }
     size_type add(const K &key, size_type inc=1) {
-        if(auto it(std::find(keys_.begin(), keys_.end(), key)); it == keys_.end()) {
+        auto it = std::find(keys_.begin(), keys_.end(), key);
+        const size_type ret(it - keys_.begin());
+        if(ret == vals_.size()) {
             vals_.push_back(inc);
             keys_.push_back(key);
-            return keys_.size() - 1;
+            return ret;
         } else {
-            const size_type ret(it - keys_.begin());
             vals_[ret] += inc;
             return ret;
         }
     }
     size_type count(const K &key) const {
-        if(auto it(std::find(keys_.begin(), keys_.end(), key)); it != keys_.end())
-            return vals_[it - keys_.begin()];
-        return 0;
+        auto it = std::find(keys_.begin(), keys_.end(), key);
+        return it == keys_.end() ? size_type(0): vals_[it - keys_.begin()];
     }
     template<typename Func>
     void for_each(const Func &func) {
@@ -243,7 +246,7 @@ public:
     void for_each(const Func &func) const {
         for(size_type i = 0; i < keys_.size(); func(keys_[i], vals_[i]), ++i);
     }
-    template<typename Q=K, typename T=std::enable_if_t<std::is_arithmetic_v<Q>>>
+    template<typename Q=K, typename T=typename std::enable_if<std::is_arithmetic<Q>::value>::type>
     void write(std::FILE *fp) {
         std::fprintf(fp, "Size: %zu", size());
         for(size_t i(0); i < size(); ++i) {
@@ -276,32 +279,59 @@ public:
     }
     template <typename K1, typename F, typename... Args>
         std::pair<size_type, bool> uprase_fn(K1 &&key, F fn, Args &&... val) {
-        if(auto it(std::find(keys_.begin(), keys_.end(), key)); it == keys_.end()) {
+            
+        auto it(std::find(keys_.begin(), keys_.end(), key));
+        if(it == keys_.end()) {
             keys_.emplace_back(key);
             vals_.emplace_back(std::forward<Args>(val)...);
-            return std::make_pair(size_type(keys_.size()), false);
+            return std::make_pair(size_type(keys_.size() - 1), false);
         } else {
             const size_type dist = it - keys_.begin();
             fn(keys_[dist], vals_[dist]);
             return std::make_pair(dist, true);
         }
     }
-    template<typename Q=V, typename=std::enable_if_t<std::is_trivially_constructible_v<Q>>>
+    template<typename Q=V, typename=typename std::enable_if<std::is_trivially_constructible<Q>::value>::type>
     V &operator[](const K &key) {
         size_type ind;
-        if(auto it = std::find(keys_.begin(), keys_.end(), key) ; it == keys_.end()) {
+        auto it = std::find(keys_.begin(), keys_.end(), key);
+        if(it == keys_.end()) {
             ind = vals_.size();
             keys_.push_back(key);
             vals_.emplace_back();
         } else ind = it - keys_.begin();
         return vals_[ind];
     }
-    V &operator[](const K &key) const {
+    template<typename Q=V, typename=typename std::enable_if<std::is_trivially_constructible<Q>::value>::type>
+    const V &operator[](const K &key) const {
         size_type ind;
-        if(auto it = std::find(keys_.begin(), keys_.end(), key) ; unlikely(it == keys_.end())) {
-            throw std::out_of_range(std::string("Key ") + key + " not found");
+        auto it = std::find(keys_.begin(), keys_.end(), key);
+        if(it == keys_.end()) {
+            ind = vals_.size();
+            keys_.push_back(key);
+            vals_.emplace_back();
         } else ind = it - keys_.begin();
         return vals_[ind];
+    }
+    template<typename Q=V, typename=typename std::enable_if<std::is_trivially_constructible<Q>::value>::type>
+    V &at(const K &key) {
+        size_type ind;
+        auto it = std::find(keys_.begin(), keys_.end(), key);
+        if(it == keys_.end()) {
+            using std::to_string;
+            throw std::out_of_range(std::string("Missing key ") + to_string(key));
+        }
+        return vals_[it - keys_.begin()];
+    }
+    template<typename Q=V, typename=typename std::enable_if<std::is_trivially_constructible<Q>::value>::type>
+    const V &at(const K &key) const {
+        size_type ind;
+        auto it = std::find(keys_.begin(), keys_.end(), key);
+        if(it == keys_.end()) {
+            using std::to_string;
+            throw std::out_of_range(std::string("Missing key ") + to_string(key));
+        }
+        return vals_[it - keys_.begin()];
     }
     template<typename Func>
     void for_each(const Func &func) {
