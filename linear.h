@@ -43,7 +43,7 @@ public:
     using pointer_type = T *;
 
     template<typename... FactoryArgs>
-    set(size_type n=0, bool init=!std::is_pod_v<T>,
+    set(size_type n=0, bool init=!std::is_pod<T>::value,
         FactoryArgs &&...args):
             n_{0}, m_{n}, data_{static_cast<T *>(std::malloc(sizeof(T) * n))} {
         if(data_ == nullptr)
@@ -165,7 +165,7 @@ public:
     T &operator[](size_type idx) {return data_[idx];}
     const T &operator[](size_type idx) const {return data_[idx];}
     ~set(){
-        if constexpr(!std::is_trivially_destructible_v<T>) {
+        if constexpr(!std::is_trivially_destructible<T>::value) {
             for(auto &el: *this) el.~T();
         }
     }
@@ -203,7 +203,7 @@ public:
             return iterator(ref_, ind_ + 1);
         }
         auto operator*() const {
-            return std::make_pair(std::reference_wrapper(keys_[ind_]), std::reference_wrapper(vals_[ind_]));
+            return std::make_pair(std::reference_wrapper<K>(keys_[ind_]), std::reference_wrapper<SizeType>(vals_[ind_]));
         }
     };
     iterator begin() {return iterator(*this, 0);}
@@ -243,7 +243,7 @@ public:
     void for_each(const Func &func) const {
         for(size_type i = 0; i < keys_.size(); func(keys_[i], vals_[i]), ++i);
     }
-    template<typename Q=K, typename T=std::enable_if_t<std::is_arithmetic_v<Q>>>
+    template<typename Q=K, typename T=std::enable_if_t<std::is_arithmetic<Q>::value>>
     void write(std::FILE *fp) {
         std::fprintf(fp, "Size: %zu", size());
         for(size_t i(0); i < size(); ++i) {
@@ -286,7 +286,7 @@ public:
             return std::make_pair(dist, true);
         }
     }
-    template<typename Q=V, typename=std::enable_if_t<std::is_trivially_constructible_v<Q>>>
+    template<typename Q=V, typename=std::enable_if_t<std::is_trivially_constructible<Q>::value>>
     V &operator[](const K &key) {
         size_type ind;
         if(auto it = std::find(keys_.begin(), keys_.end(), key) ; it == keys_.end()) {
