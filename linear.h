@@ -169,7 +169,7 @@ public:
     }
     static constexpr bool support_for_each() {return true;}
 };
-template<typename T, typename SizeType=size_t, class ResizeRatio=std::ratio<3,2>>
+template<typename T, typename SizeType, class ResizeRatio>
 void swap(set<T, SizeType, ResizeRatio> &lhs, set<T, SizeType, ResizeRatio> &rhs) {
     lhs.swap(rhs);
 }
@@ -201,7 +201,7 @@ public:
             return iterator(ref_, ind_ + 1);
         }
         auto operator*() const {
-            return std::make_pair(std::reference_wrapper<K>(keys_[ind_]), std::reference_wrapper<SizeType>(vals_[ind_]));
+            return std::make_pair(std::reference_wrapper<K>(ref_.keys_[ind_]), std::reference_wrapper<SizeType>(ref_.vals_[ind_]));
         }
     };
     iterator begin() {return iterator(*this, 0);}
